@@ -1,0 +1,77 @@
+import json
+import boto3
+import pymysql
+import csv
+from datetime import datetime
+
+# Initialize the S3 client
+s3_client = boto3.client('s3')
+
+# RDS settings
+rds_host = 'database-1.cmb2ivaq2yj2.us-east-1.rds.amazonaws.com'
+rds_username = 'admin'
+rds_password = 'MeherTeja123'
+rds_db_name = 'sample'
+
+def lambda_handler(event, context):
+    # Get the bucket name and key from the event
+    bucket = event['Records'][0]['s3']['bucket']['name']
+    key = event['Records'][0]['s3']['object']['key']
+    
+    # Download the CSV file from S3
+    s3_client.download_file(bucket, key, '/tmp/temp.csv')
+    
+    # Connect to the RDS MySQL instance
+    connection = pymysql.connect(
+        host=rds_host,
+        user=rds_username,
+        password=rds_password,
+        database=rds_db_name,
+    )
+    
+    try:
+        with connection.cursor() as cursor:
+            # Open the CSV file and read its contents
+            with open('/tmp/temp.csv', 'r') as csvfile:
+                csvreader = csv.reader(csvfile)
+                next(csvreader)  # Skip the header row
+                
+                # Prepare the SQL query
+                for row in csvreader:
+                    try:
+                        store, dept, date_str, weekly_sales, isholiday = row
+                        store = int(store)
+                        dept = int(dept)
+                        date = datetime.strptime(date_str, '%d/%m/%Y').date()
+                        weekly_sales = float(weekly_sales)
+                        isholiday = True if isholiday.lower() == 'true' else False
+                        
+                        sql = "INSERT INTO sample.sales_data (store, dept, date, weekly_sales, isholiday) VALUES (%s, %s, %s, %s, %s)"
+                        cursor.execute(sql, (store, dept, date, weekly_sales, isholiday))
+                        
+                        # Manually construct the SQL string for logging purposes
+                        sql_log = f"INSERT INTO sample.sales_data (store, dept, date, weekly_sales, isholiday) VALUES ({store}, {dept}, '{date}', {weekly_sales}, {isholiday})"
+                        print(f"Executed SQL: {sql_log}")
+                    except Exception as insert_err:
+                        print(f"Insert error for row {row}: {insert_err}")
+        
+                    # Commit the transaction
+                    connection.commit()
+                    print("Transaction committed")
+        
+    except pymysql.MySQLError as e:
+        print(f"MySQL Error: {e}")
+        connection.rollback()
+        
+    except Exception as e:
+        print(f"General Error: {e}")
+        connection.rollback()
+        
+    finally:
+        connection.close()
+        print("Connection closed")
+    
+    return {
+        'statusCode': 200,
+        'body': json.dumps('CSV data processed successfully')
+    }
