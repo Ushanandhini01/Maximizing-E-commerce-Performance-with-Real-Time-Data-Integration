@@ -1,1 +1,2 @@
-# Maximizing-E-commerce-Performance-with-Real-Time-Data-Integration
+# RetailStream: Comprehensive Data Integration and Analytics Pipeline
+# A large retail chain struggles to integrate data from multiple stores, leading to delayed insights and inefficient decision-making. The existing manual process of consolidating sales and feature data is time-consuming and prone to errors, causing missed opportunities during peak shopping periods. To simplify the process we use real-time data analytics
